@@ -68,6 +68,7 @@ class Uniswap:
         # use_eip1559: bool = True,
         factory_contract_addr: str = None,
         router_contract_addr: str = None,
+        chain: str = 'eth',
     ) -> None:
         """
         :param address: The public address of the ETH wallet to use.
@@ -78,7 +79,11 @@ class Uniswap:
         :param default_slippage: Default slippage for a trade, as a float (0.01 is 1%). WARNING: slippage is untested.
         :param factory_contract_addr: Can be optionally set to override the address of the factory contract.
         :param router_contract_addr: Can be optionally set to override the address of the router contract (v2 only).
+        :param chain: Set to use another chain (can be eth, bsc, fantom, or polygon). Used to fix a bsc gas error.
         """
+
+        self.chain = chain
+
         self.address = _str_to_addr(
             address or "0x0000000000000000000000000000000000000000"
         )
@@ -1106,7 +1111,7 @@ class Uniswap:
             tx_params = self._get_tx_params()
         transaction = function.buildTransaction(tx_params)
 
-        if "gas" not in tx_params:
+        if "gas" not in tx_params or self.chain == 'bsc':
             # `use_estimate_gas` needs to be True for networks like Arbitrum (can't assume 250000 gas),
             # but it breaks tests for unknown reasons because estimateGas takes forever on some tx's.
             # Maybe an issue with ganache? (got GC warnings once...)
@@ -1140,6 +1145,10 @@ class Uniswap:
         }
         if gas:
             params["gas"] = gas
+
+        if self.chain == 'bsc':
+            params["gasPrice"] = self.w3.eth.gas_price
+            params["gas"] = Wei(250000)  # self.w3.eth.gas_price
         return params
 
     # ------ Price Calculation Utils ---------------------------------------------------
